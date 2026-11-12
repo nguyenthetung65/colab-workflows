@@ -146,7 +146,7 @@ IS_COLAB = Path("/content").exists()
 if IS_COLAB and not os.path.exists("/content/drive/MyDrive"):
     try:
         from google.colab import drive
-        # [ZERO-DRIVE] drive.mount disabled
+        drive.mount("/content/drive")
         print("✅ Đã kết nối Google Drive thành công!")
     except Exception as e:
         print(f"⚠ Lỗi gắn Drive: {e}")
@@ -1549,37 +1549,8 @@ async def chay_pipeline_1_tinh(slug, conf):
     if not EP_CHAY_LAI:
         if final_drive_file and final_drive_file.exists() and _fresh(final_drive_file):
             is_done = True
-            target_done_file = final_drive_file
         elif final_local_file.exists() and _fresh(final_local_file):
             is_done = True
-            target_done_file = final_local_file
-    # Kiem tra che do Vet Delta: Neu file cu con diem thieu SDT thi tu dong vet tiep o GD4 (bo qua GD1)
-    if is_done and globals().get('VET_DELTA_DIEM_THIEU_SDT', True) and globals().get('BAT_GD4_BO_SUNG_SDT', True) and target_done_file:
-        try:
-            import os
-            chk_path = Path(target_done_file).resolve()
-            chk_str = str(chk_path)
-            if os.name == 'nt' and not chk_str.startswith(chr(92)*2 + '?' + chr(92)):
-                chk_str = chr(92)*2 + '?' + chr(92) + chk_str
-            wb_chk = openpyxl.load_workbook(chk_str, read_only=True)
-            ws_chk = wb_chk['Tất cả (chuẩn hóa)'] if 'Tất cả (chuẩn hóa)' in wb_chk.sheetnames else None
-            hdr_chk = {str(c.value).strip(): idx for idx, c in enumerate(ws_chk[1], start=1) if c.value} if ws_chk else {}
-            p_idx = hdr_chk.get('Số điện thoại')
-            missing_cnt = 0
-            if p_idx and ws_chk:
-                for row in ws_chk.iter_rows(min_row=2, min_col=p_idx, max_col=p_idx, values_only=True):
-                    val = row[0]
-                    if not val or len(str(val).strip()) < 6:
-                        missing_cnt += 1
-            wb_chk.close()
-            if missing_cnt > 0:
-                print(f"   🔄 [VÉT DELTA TỰ ĐỘNG]: File cũ {target_done_file.name} còn {missing_cnt:,} điểm CHƯA CÓ SĐT. Tự động kích hoạt Vét GĐ4 (bỏ qua GĐ1/GĐ2)!")
-                is_done = False
-                curr_file = target_done_file
-        except Exception as e_chk:
-            logger.warning(f"[VÉT DELTA] Cảnh báo không đọc được file {target_done_file.name}: {e_chk}", exc_info=True)
-            print(f"   ⚠️ [CẢNH BÁO VÉT DELTA]: Không thể đọc file {target_done_file.name}: {e_chk}. Tiếp tục theo trạng thái hoàn thành mặc định.")
-
     if is_done:
         print(f"   ⏩ [SMART RESUME]: Đã có file hoàn thiện ({final_local_file.name}). Bỏ qua!")
         return "Đã hoàn thành (Bỏ qua)", time.time() - t_start_prov, True
