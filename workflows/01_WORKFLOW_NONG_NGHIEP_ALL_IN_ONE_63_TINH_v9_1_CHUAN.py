@@ -245,6 +245,10 @@ def safe_copy(src, dst):
         dst_p.parent.mkdir(parents=True, exist_ok=True)
         tmp_dst = dst_p.parent / f"{dst_p.name}.tmp_{int(time.time()*1000)}"
         shutil.copy2(src, tmp_dst)
+        # [Vá P2 fsync atomic]: Ép đồng bộ buffer xuống đĩa trước khi atomic replace
+        try:
+            with open(tmp_dst, 'rb') as f_sync: os.fsync(f_sync.fileno())
+        except Exception: pass
         try:
             os.replace(tmp_dst, dst_p)
         except OSError:
