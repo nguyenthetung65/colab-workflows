@@ -59,7 +59,7 @@ LIMIT_TEST = 0                    #@param {type:"integer"}
 CONCURRENCY_WORKERS = 4           #@param {type:"integer"}
 RANDOM_SEED = 42                  #@param {type:"integer"} # 0 = ngẫu nhiên; khác 0 = thứ tự quét ô lặp lại được
 EMAIL_OSM = "tungtbhn@gmail.com"  #@param {type:"string"}
-SLEEP_OSM = 1.05                  #@param {type:"number"}
+SLEEP_OSM = 1.2                  #@param {type:"number"}
 DRIVE_SUBDIR = "chuan_hoa_thuoc_la"  #@param {type:"string"}
 #@markdown ---
 
@@ -210,12 +210,22 @@ def _detect_drive_root():
         Path("H:/My Drive"),
     ]
     for p in candidates:
-        if p.exists() and p.is_dir():
-            return p
-    for letter in "DEFGH":
-        p = Path(f"{letter}:/My Drive")
-        if p.exists() and p.is_dir():
-            return p
+        try:
+            if os.path.exists(p) and os.path.isdir(p):
+                return p
+        except Exception:
+            pass
+    # An toàn trên Windows: chỉ quét ổ đĩa tồn tại, bọc try/except tránh treo hệ thống
+    if os.name == 'nt':
+        for letter in "DEFGH":
+            try:
+                drive_path = f"{letter}:\\"
+                if os.path.exists(drive_path):
+                    p = Path(f"{letter}:/My Drive")
+                    if os.path.exists(p) and os.path.isdir(p):
+                        return p
+            except Exception:
+                pass
     return None
 
 ROOT_DRIVE = _detect_drive_root()
@@ -287,7 +297,7 @@ def _fresh(out_path, *src_paths):
             try:
                 sheet = wb_chk['Tất cả (chuẩn hóa)'] if 'Tất cả (chuẩn hóa)' in wb_chk.sheetnames else None
                 n_rows = sheet.max_row if sheet else 0
-                has_val = bool(sheet and sheet.max_row >= 2 and sheet.cell(2, 1).value is not None)
+                has_val = bool(sheet and sheet.max_row >= 2 and (sheet.cell(2, 1).value is not None or sheet.cell(2, 2).value is not None))
             finally:
                 wb_chk.close()
         except Exception:
@@ -446,7 +456,7 @@ def _kw(nr, nl, accented, ascii_):
 _RE_THUOC_LA = re.compile(r"\b(thuoc la|thuoc lao|cigar|xi ga|thuoc la dien tu|vape|pod|shisha|hut thuoc)\b", re.I)
 _RE_TAP_HOA = re.compile(r"\b(tap hoa|bach hoa|tap pham|kiot|ki ot|dai ly tap hoa|hang tap hoa)\b", re.I)
 _RE_SIEU_THI = re.compile(r"\b(sieu thi|sieu thi mini|mart|minimart|mini mart|tien loi|winmart|circle k|ministop|family mart|gs25|7-eleven|seven eleven)\b", re.I)
-_RE_QUAN_NUOC = re.compile(r"\b(quan nuoc|tra da|ca phe|cafe|coffee|tra sua|nuoc mia|sinh to|nuoc ep|giai khat|quan an|nha hang|quan nhau|bia hoi|bia tuoi|quan bia|bar|pub|bida)\b", re.I)
+_RE_QUAN_NUOC = re.compile(r"\b(quan nuoc|tra da|ca phe|cafe|coffee|tra sua|nuoc mia|sinh to|nuoc ep|giai khat|quan an|nha hang|quan nhau|bia hoi|bia tuoi|quan bia|bar(?!ber)|pub|bida)\b", re.I)
 _RE_HIEU_THUOC = re.compile(r"\b(nha thuoc|quay thuoc|hieu thuoc|tan duoc|dong y|pharmacy|duoc pham)\b", re.I)
 _RE_LUU_TRU = re.compile(r"\b(khach san|nha nghi|homestay|hotel|motel|resort|nha tro)\b", re.I)
 _RE_KHAC = re.compile(r"\b(xay dung|vat lieu|dien may|dien tu|dien thoai|xe|gas|xang|spa|lam dep|nong nghiep|may mac|thoi trang|giay dep|my pham|noi that|kim khi)\b", re.I)
@@ -854,7 +864,7 @@ async def quet_maps_pipeline(slug, conf):
                     handled += 1
 
                     if ok:
-                        # Tinh chỉnh DeepSeek: Bọc Lock toàn bộ việc check và add seen_places (triệt tiêu race condition)
+                        # db_lock bảo vệ tính nhất quán khi flush buffer và đồng bộ cấu trúc seen_places
                         with db_lock:
                             for r in rows:
                                 if r["Place ID"] not in seen_places:
@@ -876,6 +886,16 @@ async def quet_maps_pipeline(slug, conf):
                     if ok:
                         blocked["n"] = max(0, blocked["n"] - 1)
                     if len(buf_places) >= 15 or len(buf_done) >= 15: flush()
+                    # [VÁ ZERO-CRASH GĐ1]: Giải phóng DOM Chrome khi quét ô bản đồ
+                    if IS_COLAB and len(seen_places) % 300 == 0:
+                        try:
+                            from IPython.display import clear_output
+                            clear_output(wait=True)
+                            import gc
+                            gc.collect()
+                        except Exception:
+                            pass
+
                     # Giãn nhịp an toàn 1.5s - 3.0s chống Google Maps rate-limit IP
                     await asyncio.sleep(random.uniform(1.5, 3.0))
             finally:
@@ -1116,7 +1136,7 @@ def osm_reverse_lookup(lat, lon, retries=2):
                 if not (street or admin): return None
                 return street, admin, "OSM Reverse"
             if resp.status_code in (403, 429, 503):
-                time.sleep(5 * (k + 1))
+                time.sleep(30 * (2 ** k))
         except Exception:
             time.sleep(2 * (k + 1))
     return None
@@ -1358,6 +1378,16 @@ async def enrich_phone_pipeline(slug, conf, curr_file):
                         handled += 1
                         stats["since_commit"] += 1
                         if stats["since_commit"] >= 50: commit_and_sync()
+                        # [VÁ ZERO-CRASH]: Giải phóng DOM Chrome & Garbage Collector chống tràn Desktop Heap
+                        if IS_COLAB and (stats["ok"] + stats["fail"]) % 250 == 0:
+                            try:
+                                from IPython.display import clear_output
+                                clear_output(wait=True)
+                                import gc
+                                gc.collect()
+                            except Exception:
+                                pass
+
                         # [Vá W-NEW-1]: Giãn nhịp an toàn 2.0s - 4.0s cho trang chi tiết place
                         await asyncio.sleep(random.uniform(2.0, 4.0))
                 finally:
@@ -1563,7 +1593,7 @@ async def chay_pipeline_1_tinh(slug, conf):
                 is_done = False
                 curr_file = target_done_file
         except Exception as e_chk:
-            logger.warning(f"[VÉT DELTA] Cảnh báo không đọc được file {target_done_file.name}: {e_chk}", exc_info=True)
+            print(f"   ⚠️ [VÉT DELTA] Cảnh báo không đọc được file {target_done_file.name}: {e_chk}", flush=True)
             print(f"   ⚠️ [CẢNH BÁO VÉT DELTA]: Không thể đọc file {target_done_file.name}: {e_chk}. Tiếp tục theo trạng thái hoàn thành mặc định.")
 
     if is_done:
