@@ -54,7 +54,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
+         
 
       - name: 3. Cai dat cac thu vien toi uu vat ly & Playwright
         run: |
