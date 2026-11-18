@@ -65,7 +65,7 @@ jobs:
           playwright install --with-deps chromium
 
       - name: 4. Ket noi Mang ao WireGuard Tailscale Mesh
-        uses: tailscale/github-action@e89be2849909289255a4097eb631a2a4b82d921d # v2 pinned SHA
+        uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
           args: --accept-routes=true --hostname=kronos-gh-worker-${{ matrix.worker_id }}
