@@ -30,6 +30,15 @@ on:
           - ha-noi
           - tp-ho-chi-minh
           - da-nang
+      dispatch_mode:
+        description: 'Che do phan phoi (auto_10_4: 10 quet moi + 4 vet SDT, all_new: 14 quet moi, all_vet: 14 vet SDT)'
+        required: true
+        default: 'auto_10_4'
+        type: choice
+        options:
+          - auto_10_4
+          - all_new
+          - all_vet
   schedule:
     - cron: '0 */4 * * *' # Chay tu dong moi 4 tieng khong can nguoi bam
 
@@ -85,12 +94,13 @@ jobs:
           cp -r ./tmp_decrypted/* /dev/shm/kronos_core/
           rm -rf ./tmp_decrypted
 
-      - name: 7. Khoi chay Kronos Distributed 6-Stage Engine (14 Workflows Goc)
+      - name: 7. Khoi chay Kronos Hybrid Dispatcher Engine (10 Quet Moi + 4 Vet SDT)
         env:
           MASTER_PC_IP: "100.78.157.51"
           MASTER_INGEST_PORT: "8000"
           KRONOS_INDUSTRY: ${{ inputs.industry || 'all_7_nganh' }}
           KRONOS_PROVINCE: ${{ inputs.province || 'toan-quoc' }}
+          KRONOS_DISPATCH_MODE: ${{ inputs.dispatch_mode || 'auto_10_4' }}
           KRONOS_WORKER_ID: ${{ matrix.worker_id }}
           KRONOS_NUM_WORKERS: 14
           KRONOS_LIMIT: 3000
@@ -98,7 +108,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           cd /dev/shm/kronos_core
-          python kronos_github_runner_6_stages.py
+          python kronos_github_runner_hybrid.py
 
       - name: 8. Sao luu Cloud Buffer vao GitHub Artifacts (Phong thu khi PC dong / tat may)
         if: always()
