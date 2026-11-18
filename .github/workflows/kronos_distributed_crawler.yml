@@ -1,0 +1,114 @@
+name: KRONOS-HYBRID DISTRIBUTED ZERO-COST CRAWLER
+
+on:
+  workflow_dispatch:
+    inputs:
+      industry:
+        description: 'Chon nganh hang can quet (Du 7 nganh hoac quet tat ca)'
+        required: true
+        default: 'all_7_nganh'
+        type: choice
+        options:
+          - all_7_nganh
+          - fmcg
+          - pharma
+          - horeca
+          - thuoc_la
+          - nong_nghiep
+          - automotive
+          - vlxd
+      province:
+        description: 'Chon pham vi dia ly quet'
+        required: true
+        default: 'toan-quoc'
+        type: choice
+        options:
+          - toan-quoc
+          - mien-bac
+          - mien-trung
+          - mien-nam
+          - ha-noi
+          - tp-ho-chi-minh
+          - da-nang
+  schedule:
+    - cron: '0 */4 * * *'
+
+jobs:
+  kronos-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    concurrency:
+      group: kronos-worker-${{ matrix.worker_id }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      max-parallel: 14
+      matrix:
+        worker_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+
+    steps:
+      - name: 1. Checkout Public Shell
+        uses: actions/checkout@v4
+
+      - name: 2. Cai dat Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 3. Cai dat cac thu vien toi uu vat ly & Playwright
+        run: |
+          pip install --upgrade pip
+          pip install uvloop curl_cffi cryptography aiohttp psutil playwright beautifulsoup4
+          playwright install --with-deps chromium
+
+      - name: 4. Ket noi Mang ao WireGuard Tailscale Mesh
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          args: --accept-routes=true --hostname=kronos-gh-worker-${{ matrix.worker_id }}
+
+      - name: 5. Kiem tra thong tuyen toi Master PC
+        run: |
+          ping -c 3 100.78.157.51 || echo "Master PC ping warning, checking HTTP..."
+          curl -s http://100.78.157.51:8000/health || echo "PC offline, fallback Cloud Buffer"
+
+      - name: 6. Giai ma loi ma nguon vao RAM Disk (/dev/shm)
+        run: |
+          python kronos_security_encryptor.py \
+            --mode decrypt \
+            --password "${{ secrets.KRONOS_CORE_PASSWORD }}" \
+            --output kronos_core_encrypted.bin
+          mkdir -p /dev/shm/kronos_core
+          cp -r ./tmp_decrypted/* /dev/shm/kronos_core/
+          rm -rf ./tmp_decrypted
+
+      - name: 7. Khoi chay Kronos Distributed Crawler
+        env:
+          MASTER_PC_IP: "100.78.157.51"
+          MASTER_INGEST_PORT: "8000"
+          KRONOS_INDUSTRY: ${{ inputs.industry || 'all' }}
+          KRONOS_PROVINCE: ${{ inputs.province || 'all' }}
+          KRONOS_WORKER_ID: ${{ matrix.worker_id }}
+          KRONOS_NUM_WORKERS: 14
+          KRONOS_LIMIT: 3000
+          INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          cd /dev/shm/kronos_core
+          python kronos_github_action_runner.py
+
+      - name: 8. Sao luu Cloud Buffer vao GitHub Artifacts (Phong thu khi PC dong / tat may)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kronos-cloud-buffer-worker-${{ matrix.worker_id }}
+          path: /tmp/kronos_run/kronos_cloud_buffer_*.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: 9. Tieu huy ma nguon tren RAM sau khi hoan tat
+        if: always()
+        run: |
+          shred -u -z /dev/shm/kronos_core/* || true
+          rm -rf /dev/shm/kronos_core
