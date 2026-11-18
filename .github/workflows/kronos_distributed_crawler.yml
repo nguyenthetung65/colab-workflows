@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 350 # An toan duoi tran 360 phut (6 gio) cua GitHub Actions
     concurrency:
       group: kronos-worker-${{ matrix.worker_id }}
-      cancel-in-progress: false
+      cancel-in-progress: true
     strategy:
       fail-fast: false
       max-parallel: 14 # 14 workers dong thoi tren ha tang GitHub
@@ -85,12 +85,12 @@ jobs:
           cp -r ./tmp_decrypted/* /dev/shm/kronos_core/
           rm -rf ./tmp_decrypted
 
-      - name: 7. Khoi chay Kronos Distributed Crawler
+      - name: 7. Khoi chay Kronos Distributed 6-Stage Engine (14 Workflows Goc)
         env:
           MASTER_PC_IP: "100.78.157.51"
           MASTER_INGEST_PORT: "8000"
-          KRONOS_INDUSTRY: ${{ inputs.industry || 'all' }}
-          KRONOS_PROVINCE: ${{ inputs.province || 'all' }}
+          KRONOS_INDUSTRY: ${{ inputs.industry || 'all_7_nganh' }}
+          KRONOS_PROVINCE: ${{ inputs.province || 'toan-quoc' }}
           KRONOS_WORKER_ID: ${{ matrix.worker_id }}
           KRONOS_NUM_WORKERS: 14
           KRONOS_LIMIT: 3000
@@ -98,7 +98,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           cd /dev/shm/kronos_core
-          python kronos_github_action_runner.py
+          python kronos_github_runner_6_stages.py
 
       - name: 8. Sao luu Cloud Buffer vao GitHub Artifacts (Phong thu khi PC dong / tat may)
         if: always()
@@ -116,7 +116,7 @@ jobs:
           rm -rf /dev/shm/kronos_core
 
       - name: 10. Tu dong noi ca tiep theo (Chay lien tuc 24/7 khong nghi)
-        if: always()
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

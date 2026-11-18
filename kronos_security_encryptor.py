@@ -56,7 +56,12 @@ def encrypt_files_to_bundle(file_paths: List[Path], password: str, output_bundle
         for f in file_paths:
             f = Path(f)
             if f.exists():
-                zf.write(f, arcname=f.name)
+                if f.is_dir():
+                    for sub in f.rglob('*'):
+                        if sub.is_file():
+                            zf.write(sub, arcname=str(sub.relative_to(f.parent)).replace("\\", "/"))
+                else:
+                    zf.write(f, arcname=f.name)
     raw_bytes = zip_buffer.getvalue()
 
     # 2. Sinh Salt (16B), Nonce GCM (12B) va khoa AES-256
