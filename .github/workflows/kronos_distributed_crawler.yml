@@ -31,30 +31,32 @@ on:
           - tp-ho-chi-minh
           - da-nang
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '0 */4 * * *' # Chay tu dong moi 4 tieng khong can nguoi bam
 
 jobs:
   kronos-worker:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    permissions:
+      actions: write
+      contents: read
+    timeout-minutes: 350 # An toan duoi tran 360 phut (6 gio) cua GitHub Actions
     concurrency:
       group: kronos-worker-${{ matrix.worker_id }}
       cancel-in-progress: false
     strategy:
       fail-fast: false
-      max-parallel: 14
+      max-parallel: 14 # 14 workers dong thoi tren ha tang GitHub
       matrix:
         worker_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 
     steps:
       - name: 1. Checkout Public Shell
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1 pinned SHA
 
-      - name: 2. Cai dat Python 3.11
-        uses: actions/setup-python@v5
+      - name: 2. Cai dat Python 3.11 & uvloop
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c # v5.0.0 pinned SHA
         with:
           python-version: '3.11'
-         
 
       - name: 3. Cai dat cac thu vien toi uu vat ly & Playwright
         run: |
@@ -63,15 +65,15 @@ jobs:
           playwright install --with-deps chromium
 
       - name: 4. Ket noi Mang ao WireGuard Tailscale Mesh
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@e89be2849909289255a4097eb631a2a4b82d921d # v2 pinned SHA
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
           args: --accept-routes=true --hostname=kronos-gh-worker-${{ matrix.worker_id }}
 
-      - name: 5. Kiem tra thong tuyen toi Master PC
+      - name: 5. Kiem tra thong tuyen toi Master PC (100.78.157.51)
         run: |
           ping -c 3 100.78.157.51 || echo "Master PC ping warning, checking HTTP..."
-          curl -s http://100.78.157.51:8000/health || echo "PC offline, fallback Cloud Buffer"
+          curl -s http://100.78.157.51:8000/health || exit 1
 
       - name: 6. Giai ma loi ma nguon vao RAM Disk (/dev/shm)
         run: |
@@ -112,3 +114,13 @@ jobs:
         run: |
           shred -u -z /dev/shm/kronos_core/* || true
           rm -rf /dev/shm/kronos_core
+
+      - name: 10. Tu dong noi ca tiep theo (Chay lien tuc 24/7 khong nghi)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ matrix.worker_id }}" = "1" ]; then
+            echo "Ca chay da hoan tat thanh cong! Dang tu dong kich hoat ca tiep theo..."
+            gh workflow run kronos_distributed_crawler.yml --ref main || true
+          fi

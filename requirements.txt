@@ -1,0 +1,7 @@
+uvloop
+curl_cffi
+cryptography
+aiohttp
+psutil
+playwright
+beautifulsoup4

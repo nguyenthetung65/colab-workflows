@@ -28,6 +28,7 @@ from pathlib import Path
 DEFAULT_PROXY_PORT = int(os.environ.get("KRONOS_PROXY_PORT", "8888"))
 MASTER_PC_TAILSCALE_IP = os.environ.get("MASTER_PC_IP", "100.78.157.51")
 MASTER_INGEST_PORT = int(os.environ.get("MASTER_INGEST_PORT", "8000"))
+INGEST_KEY = os.environ.get("INGEST_API_KEY", "4b3f34f5e3906978692e9f3e3c74859921df811d1c1fc1b968ddb3586918982d")
 HEARTBEAT_INTERVAL_SEC = int(os.environ.get("HEARTBEAT_SEC", "30"))
 PROXY_NODE_NAME = os.environ.get("KRONOS_NODE_NAME", f"colab-node-{socket.gethostname()[:8]}")
 
@@ -218,10 +219,13 @@ def send_registration_to_master(node_ip: str, port: int, node_name: str) -> bool
         "status": "ONLINE"
     }).encode("utf-8")
 
+    headers = {"Content-Type": "application/json"}
+    if INGEST_KEY:
+        headers["Authorization"] = f"Bearer {INGEST_KEY}"
     req = urllib.request.Request(
         url,
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST"
     )
     try:
