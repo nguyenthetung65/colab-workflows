@@ -81,8 +81,16 @@ jobs:
 
       - name: 5. Kiem tra thong tuyen toi Master PC (100.78.157.51)
         run: |
-          ping -c 3 100.78.157.51 || echo "Master PC ping warning, checking HTTP..."
-          curl -s http://100.78.157.51:8000/health || exit 1
+          for i in 1 2 3 4 5; do
+            if curl -sf http://100.78.157.51:8000/health > /dev/null; then
+              echo "Master PC Port 8000 ket noi thanh cong tai lan thu $i!"
+              exit 0
+            fi
+            echo "Dang thu ket noi Master PC port 8000 (lan $i/5)..."
+            sleep 3
+          done
+          echo "Khong the ket noi toi Master PC port 8000 sau 5 lan thu"
+          exit 1
 
       - name: 6. Giai ma loi ma nguon vao RAM Disk (/dev/shm)
         run: |
