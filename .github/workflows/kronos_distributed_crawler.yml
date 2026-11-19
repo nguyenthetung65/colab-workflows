@@ -116,7 +116,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           cd /dev/shm/kronos_core
-          python kronos_github_runner_hybrid.py
+          python kronos_github_runner_unified.py
 
       - name: 8. Sao luu Cloud Buffer & Stage Checkpoints vao GitHub Artifacts (Phong thu khi PC dong / tat may)
         if: always()
