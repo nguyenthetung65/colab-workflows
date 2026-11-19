@@ -1,0 +1,418 @@
+name: KRONOS-HYBRID DISTRIBUTED ZERO-COST CRAWLER (BỘ 18 - 24/7 ZERO-LOSS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      industry:
+        description: '1. Chon nganh hang can quet'
+        required: true
+        default: 'all_7_nganh'
+        type: choice
+        options:
+          - all_7_nganh
+          - thuoc_la
+          - fmcg
+          - pharma
+          - horeca
+          - nong_nghiep
+          - automotive
+          - vlxd
+
+      loai_workflow:
+        description: '2. Loai Workflow thuc thi (Quet moi, Update dinh ky, Bo 17, hoac Custom)'
+        required: true
+        default: 'all_in_one'
+        type: choice
+        options:
+          - all_in_one
+          - update_dinh_ki
+          - bo_17_phone_recovery
+          - custom_script
+
+      custom_script_path:
+        description: '3. Ten script tuy chon (Neu chon loai custom_script hoac workflow moi phat sinh)'
+        required: false
+        default: ''
+        type: string
+
+      chon_che_do_tinh:
+        description: '4. Pham vi dia ly quet (Che do Tinh/Khu vuc)'
+        required: true
+        default: 'toan-quoc'
+        type: choice
+        options:
+          - toan-quoc
+          - mien-bac
+          - mien-trung
+          - mien-nam
+          - ha-noi
+          - tp-ho-chi-minh
+          - da-nang
+          - chon_1_tinh_cu_the
+
+      tinh_cu_the:
+        description: '5. Ten tinh cu the (Neu chon che do 1 tinh cu the)'
+        required: false
+        default: 'Hà Nội'
+        type: string
+
+      dispatch_mode:
+        description: '6. Che do phan phoi Worker (auto_10_4: 10 quet moi + 4 vet SDT)'
+        required: true
+        default: 'auto_10_4'
+        type: choice
+        options:
+          - auto_10_4
+          - all_new
+          - all_vet
+
+      bat_gd1_quet_maps:
+        description: '7. Bat/Tat GĐ1: Quet Maps (Grid Scrape)'
+        required: true
+        default: true
+        type: boolean
+
+      bat_gd2_chuan_hoa:
+        description: '8. Bat/Tat GĐ2: Chuan hoa & Dedup'
+        required: true
+        default: true
+        type: boolean
+
+      bat_gd3_tra_dia_chi:
+        description: '9. Bat/Tat GĐ3: Tra dia chi OSM (Khuyen dung: xu ly tren PC Master)'
+        required: true
+        default: false
+        type: boolean
+
+      bat_gd4_bo_sung_sdt:
+        description: '10. Bat/Tat GĐ4: Bo sung SDT 3-Tier'
+        required: true
+        default: true
+        type: boolean
+
+      bat_gd5_xuat_hoan_thien:
+        description: '11. Bat/Tat GĐ5/GĐ6: Xuat hoan thien & Dong goi'
+        required: true
+        default: true
+        type: boolean
+
+      vet_delta_diem_thieu_sdt:
+        description: '12. Tu dong vet bu cac diem thieu SDT'
+        required: true
+        default: true
+        type: boolean
+
+      ep_chay_lai:
+        description: '13. Ep chay lai tu dau (False: RESUME bo qua cac buoc da lam)'
+        required: true
+        default: false
+        type: boolean
+
+  schedule:
+    # Cron du phong chong ngat quang (Canh gac moi 2 tieng neu self-chaining bi gian doan)
+    - cron: '0 */2 * * *'
+
+# Khoa chong chong cheo ca: cancel-in-progress: false giup xep hang, khong tao song song vuot quota
+concurrency:
+  group: kronos-global-crawler-pipeline
+  cancel-in-progress: false
+
+jobs:
+  kronos-worker:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    timeout-minutes: 350 # Tran 350 phut tong the cho toan bo job
+    strategy:
+      fail-fast: false
+      max-parallel: 14
+      matrix:
+        worker_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+
+    steps:
+      - name: 0. Xac dinh chu ky (tuan ISO) cho checkpoint
+        run: echo "KRONOS_CYCLE_ID=$(date -u +%G-W%V)" >> "$GITHUB_ENV"
+
+      - name: 1. Checkout Public Shell
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+
+      - name: 2. Cai dat Python 3.11 & uvloop
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c
+        with:
+          python-version: '3.11'
+
+      - name: 3. Cai dat cac thu vien toi uu vat ly & Playwright
+        run: |
+          pip install --upgrade pip
+          pip install uvloop curl_cffi cryptography aiohttp psutil playwright beautifulsoup4 openpyxl pandas boto3
+          playwright install --with-deps chromium
+
+      - name: 4. Ket noi Mang ao WireGuard Tailscale Mesh
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          args: --accept-routes=true --hostname=kronos-gh-worker-${{ matrix.worker_id }}
+
+      - name: 5. Preflight Fail-Fast Guard (<60s chong chay mu 5 gio)
+        run: |
+          python - <<'PY'
+          import sys, importlib, os
+          required = ["openpyxl", "playwright", "curl_cffi", "cryptography", "aiohttp", "pandas", "boto3", "psutil"]
+          missing = [m for m in required if not importlib.util.find_spec(m)]
+          if missing:
+              print(f"❌ [PREFLIGHT FAILED] Thieu thu vien: {missing}", file=sys.stderr)
+              sys.exit(1)
+          os.makedirs("/dev/shm/kronos_core", exist_ok=True)
+          print("✅ [PREFLIGHT PASSED] Toan bo thu vien va RAM disk /dev/shm da san sang!")
+          PY
+
+      - name: 6. Giai ma loi ma nguon vao RAM Disk (/dev/shm)
+        run: |
+          python kronos_security_encryptor.py \
+            --mode decrypt \
+            --password "${{ secrets.KRONOS_CORE_PASSWORD }}" \
+            --output kronos_core_encrypted.bin
+          mkdir -p /dev/shm/kronos_core
+          cp -r ./tmp_decrypted/* /dev/shm/kronos_core/
+          rm -rf ./tmp_decrypted
+
+      - name: 6.5. [DUAL-ENGINE RESTORE - TANG 1] Khoi phuc Checkpoint tu GitHub Actions Cache (10 GB noi bo)
+        if: ${{ !inputs.ep_chay_lai }}
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            /dev/shm/kronos_core/stage_checkpoints
+            /dev/shm/kronos_core/*.db
+          key: kronos-cache-${{ env.KRONOS_CYCLE_ID }}-w${{ matrix.worker_id }}-${{ inputs.industry }}-${{ github.run_number }}-${{ github.run_attempt }}
+          restore-keys: |
+            kronos-cache-${{ env.KRONOS_CYCLE_ID }}-w${{ matrix.worker_id }}-${{ inputs.industry }}-
+
+      - name: 6.6. [DUAL-ENGINE RESTORE - TANG 2] Khoi phuc Checkpoint tu Cloudflare R2 (Buffer vinh vien)
+        if: ${{ !inputs.ep_chay_lai }}
+        env:
+          PYTHONPATH: "/dev/shm/kronos_core"
+          KRONOS_CYCLE_ID: ${{ env.KRONOS_CYCLE_ID }}
+          KRONOS_WORKER_ID: ${{ matrix.worker_id }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || 'kronos-cloud-buffer' }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          try:
+              from module_1_cloudflare_r2_cloud_buffer import get_cloudflare_r2_client
+              r2 = get_cloudflare_r2_client()
+              wid = int(os.environ.get("KRONOS_WORKER_ID", "1"))
+              dest = Path("/dev/shm/kronos_core/stage_checkpoints")
+              dest.mkdir(parents=True, exist_ok=True)
+              if r2.is_configured():
+                  restored = r2.download_worker_checkpoint_for_resume(wid, dest)
+                  if restored:
+                      print(f"🔄 [DUAL-ENGINE RESTORE] Da cap nhat checkpoint moi nhat tu Cloudflare R2!")
+                  else:
+                      print(f"ℹ️ [DUAL-ENGINE RESTORE] R2 chua co checkpoint cho Worker #{wid}, su dung tiep checkpoint tu GitHub Cache.")
+              else:
+                  print("ℹ️ [DUAL-ENGINE FALLBACK] R2 chua cau hinh, he thong su dung 100% GitHub Actions Cache.")
+          except Exception as e:
+              print(f"Luu y Dual-Engine Restore: {e}")
+          PY
+
+      - name: 7. Khoi chay Kronos Dispatcher Engine theo Workflow duoc chon
+        timeout-minutes: 320 # Gioi han runner 320 phut, danh 30 phut du phong cho Flush WAL & Sync
+        env:
+          MASTER_PC_IP: "100.78.157.51"
+          MASTER_INGEST_PORT: "8000"
+          KRONOS_INDUSTRY: ${{ inputs.industry || 'all_7_nganh' }}
+          KRONOS_PROVINCE: ${{ inputs.chon_che_do_tinh == 'chon_1_tinh_cu_the' && inputs.tinh_cu_the || inputs.chon_che_do_tinh || 'toan-quoc' }}
+          KRONOS_DISPATCH_MODE: ${{ inputs.dispatch_mode || 'auto_10_4' }}
+          KRONOS_LOAI_WORKFLOW: ${{ inputs.loai_workflow || 'all_in_one' }}
+          KRONOS_CUSTOM_SCRIPT: ${{ inputs.custom_script_path || '' }}
+          KRONOS_WORKER_ID: ${{ matrix.worker_id }}
+          KRONOS_NUM_WORKERS: 14
+          KRONOS_LIMIT: 3000
+          KRONOS_GRID_LIMIT: 3000
+          KRONOS_MAX_RUNTIME_SEC: 18000 # 5 gio (chua 20 phut du phong cho Flush WAL & Dong goi)
+          BAT_GD1_QUET_MAPS: ${{ inputs.bat_gd1_quet_maps }}
+          BAT_GD2_CHUAN_HOA: ${{ inputs.bat_gd2_chuan_hoa }}
+          BAT_GD3_TRA_DIA_CHI: ${{ inputs.bat_gd3_tra_dia_chi }}
+          BAT_GD4_BO_SUNG_SDT: ${{ inputs.bat_gd4_bo_sung_sdt }}
+          BAT_GD5_XUAT_HOAN_THIEN: ${{ inputs.bat_gd5_xuat_hoan_thien }}
+          VET_DELTA_DIEM_THIEU_SDT: ${{ inputs.vet_delta_diem_thieu_sdt }}
+          EP_CHAY_LAI: ${{ inputs.ep_chay_lai }}
+          INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || 'kronos-cloud-buffer' }}
+        run: |
+          cd /dev/shm/kronos_core
+          python - <<'PY'
+          import os, sys, subprocess
+
+          wf_type = os.environ.get("KRONOS_LOAI_WORKFLOW", "all_in_one")
+          industry = os.environ.get("KRONOS_INDUSTRY", "all_7_nganh").lower()
+          custom_script = os.environ.get("KRONOS_CUSTOM_SCRIPT", "").strip()
+
+          script_to_run = "kronos_github_runner_unified_v18.py" if os.path.exists("kronos_github_runner_unified_v18.py") else "kronos_github_runner_unified.py"
+
+          if custom_script and os.path.exists(custom_script):
+              script_to_run = custom_script
+              print(f"🚀 [WORKFLOW CUSTOM] Khoi chay script tuy chon: {script_to_run}")
+          elif wf_type == "update_dinh_ki":
+              # Tim file workflow update dinh ky trong thu muc
+              update_pattern = f"02_WORKFLOW_{industry.upper()}_UPDATE_DINH_KI_*.py"
+              import glob
+              candidates = glob.glob(update_pattern) or glob.glob(f"workflows/{update_pattern}")
+              if candidates:
+                  script_to_run = candidates[0]
+                  print(f"🚀 [WORKFLOW UPDATE DINH KY] Khoi chay: {script_to_run}")
+              else:
+                  print(f"ℹ️ Khong tim thay script rieng cho {industry}, chay Unified Runner voi che do Update.")
+          elif wf_type == "bo_17_phone_recovery":
+              if os.path.exists("advanced_phone_recovery_pipeline.py"):
+                  script_to_run = "advanced_phone_recovery_pipeline.py"
+                  print("🎯 [BỘ 17 PHỤC HỒI SĐT 4 TẦNG] Kích hoạt: OCR Biển hiệu + Dấu chân số + MST + Tuyến đường DBSCAN.")
+
+          cmd = [sys.executable, script_to_run]
+          res = subprocess.run(cmd)
+          sys.exit(res.returncode)
+          PY
+
+      - name: 8. Flush SQLite WAL Checkpoints (Ep ghi sach tu .db-wal vao .db)
+        if: always()
+        run: |
+          python - <<'PY'
+          import glob, sqlite3, os
+          flushed = 0
+          for db_f in glob.glob("/dev/shm/kronos_core/**/*.db", recursive=True):
+              try:
+                  c = sqlite3.connect(db_f)
+                  c.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                  c.close()
+                  flushed += 1
+                  print(f"💾 [FLUSHED] {os.path.basename(db_f)}")
+              except Exception as e:
+                  print(f"Loi flush {db_f}: {e}")
+          print(f"✅ Hoan tat Flush {flushed} SQLite databases truoc khi upload.")
+          PY
+
+      - name: 8.5. [DUAL-ENGINE SAVE - TANG 1] Luu Snapshot Checkpoint vao Cloudflare R2 Buffer (Vinh vien tren may)
+        if: always()
+        env:
+          PYTHONPATH: "/dev/shm/kronos_core"
+          KRONOS_CYCLE_ID: ${{ env.KRONOS_CYCLE_ID }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || 'kronos-cloud-buffer' }}
+          WORKER_ID: ${{ matrix.worker_id }}
+        run: |
+          python - <<'PY'
+          import os, glob
+          from pathlib import Path
+          try:
+              from module_1_cloudflare_r2_cloud_buffer import get_cloudflare_r2_client
+              from module_3_runner_preflight_and_wal_guard import SQLiteWALGuard
+              r2 = get_cloudflare_r2_client()
+              if r2.is_configured():
+                  wid = int(os.environ.get("WORKER_ID", "1"))
+                  cyc = os.environ.get("KRONOS_CYCLE_ID", "").strip()
+                  prefix_r2 = f"checkpoints/{cyc + '/' if cyc else ''}w{wid:02d}"
+                  uploaded = 0
+                  snap = Path("/dev/shm/kronos_snap")
+                  snap.mkdir(parents=True, exist_ok=True)
+                  for f in glob.glob("/dev/shm/kronos_core/stage_checkpoints/*.db"):
+                      p = Path(f)
+                      dst = snap / p.name
+                      if SQLiteWALGuard.snapshot_db(p, dst):
+                          ok, msg = r2.upload_file(dst, f"{prefix_r2}/{p.name}")
+                          if ok: uploaded += 1
+                          print(f"[R2_SYNC] {msg}")
+                  for f in glob.glob("/dev/shm/kronos_core/*.xlsx") + glob.glob("/dev/shm/kronos_core/*.csv"):
+                      p = Path(f)
+                      ok, msg = r2.upload_file(p, f"{prefix_r2}/{p.name}")
+                      if ok: uploaded += 1
+                      print(f"[R2_SYNC] {msg}")
+                  print(f"☁️ [DUAL-ENGINE] Da bao toan vinh vien {uploaded} tap tin snapshot len Cloudflare R2!")
+              else:
+                  print("ℹ️ [DUAL-ENGINE] R2 chua cau hinh, he thong su dung GitHub Cache & Artifacts lam fallback.")
+          except Exception as e:
+              print(f"Canh bao R2 upload: {e}")
+          PY
+
+      - name: 8.6. [DUAL-ENGINE SAVE - TANG 2] Luu Checkpoint vao GitHub Actions Cache (10 GB noi bo)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            /dev/shm/kronos_core/stage_checkpoints
+            /dev/shm/kronos_core/*.db
+          key: kronos-cache-${{ env.KRONOS_CYCLE_ID }}-w${{ matrix.worker_id }}-${{ inputs.industry }}-${{ github.run_number }}-${{ github.run_attempt }}
+
+      - name: 9. [DUAL-ENGINE SAVE - TANG 3] Sao luu GitHub Artifacts (Phong thu 30 ngay)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kronos-w${{ matrix.worker_id }}-attempt${{ github.run_attempt }}
+          path: |
+            /dev/shm/kronos_core/stage_checkpoints/*.db
+            /dev/shm/kronos_core/*.xlsx
+            /dev/shm/kronos_core/*.csv
+            /tmp/kronos_run/kronos_cloud_buffer_*.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: 10. Tieu huy ma nguon tren RAM sau khi hoan tat
+        if: always()
+        run: |
+          shred -u -z /dev/shm/kronos_core/* || true
+          rm -rf /dev/shm/kronos_core
+
+  # Job doc lap tu dong noi ca: Chi kich hoat khi ca truoc thanh cong va nguoi dung khong bam Cancel
+  relay-next-shift:
+    needs: kronos-worker
+    if: ${{ !cancelled() && needs.kronos-worker.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch ca tiep theo (Giu nguyen pham vi, xoay tua nganh)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          STARTED=$(date -u -d "${{ github.run_started_at }}" +%s)
+          if [ $(( $(date -u +%s) - STARTED )) -lt 1800 ]; then
+            echo "⏸ Ca chạy dưới 30 phút (bất thường hoặc đã hoàn tất chu kỳ tuần này), không tự nối. Chờ cron 2h."
+            exit 0
+          fi
+
+          CUR="${{ inputs.industry || 'all_7_nganh' }}"
+          case "$CUR" in
+            thuoc_la) NEXT=fmcg;;
+            fmcg) NEXT=pharma;;
+            pharma) NEXT=horeca;;
+            horeca) NEXT=nong_nghiep;;
+            nong_nghiep) NEXT=automotive;;
+            automotive) NEXT=vlxd;;
+            *) NEXT=thuoc_la;;
+          esac
+          echo "🚀 Ca hien tai: $CUR ──► Kich hoat ca tiep theo: $NEXT"
+          gh workflow run kronos_distributed_crawler_v18.yml \
+            --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+            -f industry="$NEXT" \
+            -f loai_workflow="${{ inputs.loai_workflow || 'all_in_one' }}" \
+            -f custom_script_path="${{ inputs.custom_script_path || '' }}" \
+            -f chon_che_do_tinh="${{ inputs.chon_che_do_tinh || 'toan-quoc' }}" \
+            -f tinh_cu_the="${{ inputs.tinh_cu_the || 'Hà Nội' }}" \
+            -f dispatch_mode="${{ inputs.dispatch_mode || 'auto_10_4' }}" \
+            -f bat_gd1_quet_maps="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd1_quet_maps) || 'true' }}" \
+            -f bat_gd2_chuan_hoa="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd2_chuan_hoa) || 'true' }}" \
+            -f bat_gd3_tra_dia_chi="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd3_tra_dia_chi) || 'false' }}" \
+            -f bat_gd4_bo_sung_sdt="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd4_bo_sung_sdt) || 'true' }}" \
+            -f bat_gd5_xuat_hoan_thien="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd5_xuat_hoan_thien) || 'true' }}" \
+            -f vet_delta_diem_thieu_sdt="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.vet_delta_diem_thieu_sdt) || 'true' }}" \
+            -f ep_chay_lai=false
