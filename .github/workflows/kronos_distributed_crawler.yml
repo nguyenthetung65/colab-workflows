@@ -70,7 +70,7 @@ jobs:
       - name: 3. Cai dat cac thu vien toi uu vat ly & Playwright
         run: |
           pip install --upgrade pip
-          pip install uvloop curl_cffi cryptography aiohttp psutil playwright beautifulsoup4
+          pip install uvloop curl_cffi cryptography aiohttp psutil playwright beautifulsoup4 openpyxl pandas
           playwright install --with-deps chromium
 
       - name: 4. Ket noi Mang ao WireGuard Tailscale Mesh
@@ -125,7 +125,9 @@ jobs:
           name: kronos-cloud-buffer-worker-${{ matrix.worker_id }}
           path: |
             /tmp/kronos_run/kronos_cloud_buffer_*.json
-            /dev/shm/kronos_core/kronos_checkpoint_worker_*.db
+            /dev/shm/kronos_core/stage_checkpoints/*.db
+            /dev/shm/kronos_core/*.xlsx
+            /dev/shm/kronos_core/*.csv
             kronos_checkpoint_worker_*.db
           retention-days: 90
           if-no-files-found: ignore

@@ -5,3 +5,5 @@ aiohttp
 psutil
 playwright
 beautifulsoup4
+openpyxl
+pandas
