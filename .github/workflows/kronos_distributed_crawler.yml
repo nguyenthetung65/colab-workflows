@@ -110,12 +110,15 @@ jobs:
           cd /dev/shm/kronos_core
           python kronos_github_runner_hybrid.py
 
-      - name: 8. Sao luu Cloud Buffer vao GitHub Artifacts (Phong thu khi PC dong / tat may)
+      - name: 8. Sao luu Cloud Buffer & Stage Checkpoints vao GitHub Artifacts (Phong thu khi PC dong / tat may)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: kronos-cloud-buffer-worker-${{ matrix.worker_id }}
-          path: /tmp/kronos_run/kronos_cloud_buffer_*.json
+          path: |
+            /tmp/kronos_run/kronos_cloud_buffer_*.json
+            /dev/shm/kronos_core/kronos_checkpoint_worker_*.db
+            kronos_checkpoint_worker_*.db
           retention-days: 90
           if-no-files-found: ignore
 
