@@ -57,11 +57,12 @@ on:
         type: string
 
       dispatch_mode:
-        description: '6. Che do phan phoi Worker (auto_10_4: 10 quet moi + 4 vet SDT)'
+        description: '6. Che do phan phoi Worker (auto_14_6: 14 quet moi + 6 vet SDT)'
         required: true
-        default: 'auto_10_4'
+        default: 'auto_14_6'
         type: choice
         options:
+          - auto_14_6
           - auto_10_4
           - all_new
           - all_vet
@@ -79,9 +80,9 @@ on:
         type: boolean
 
       bat_gd3_tra_dia_chi:
-        description: '9. Bat/Tat GĐ3: Tra dia chi OSM (Khuyen dung: xu ly tren PC Master)'
+        description: '9. Bat/Tat GĐ3: Tra dia chi OSM (Bu dia chi thuc dia chi tiet)'
         required: true
-        default: false
+        default: true
         type: boolean
 
       bat_gd4_bo_sung_sdt:
@@ -138,9 +139,9 @@ jobs:
     timeout-minutes: 350 # Tran 350 phut tong the cho toan bo job
     strategy:
       fail-fast: false
-      max-parallel: 14
+      max-parallel: 20
       matrix:
-        worker_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+        worker_id: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 
     steps:
       - name: 0. Xac dinh chu ky (tuan ISO) cho checkpoint
@@ -243,7 +244,7 @@ jobs:
           KRONOS_LOAI_WORKFLOW: ${{ inputs.loai_workflow || 'all_in_one' }}
           KRONOS_CUSTOM_SCRIPT: ${{ inputs.custom_script_path || '' }}
           KRONOS_WORKER_ID: ${{ matrix.worker_id }}
-          KRONOS_NUM_WORKERS: 14
+          KRONOS_NUM_WORKERS: 20
           KRONOS_LIMIT: 3000
           KRONOS_GRID_LIMIT: 3000
           KRONOS_MAX_RUNTIME_SEC: ${{ inputs.max_runtime_giay || '18000' }}
@@ -430,10 +431,10 @@ jobs:
             -f custom_script_path="${{ inputs.custom_script_path || '' }}" \
             -f chon_che_do_tinh="${{ inputs.chon_che_do_tinh || 'toan-quoc' }}" \
             -f tinh_cu_the="${{ inputs.tinh_cu_the || 'Hà Nội' }}" \
-            -f dispatch_mode="${{ inputs.dispatch_mode || 'auto_10_4' }}" \
+            -f dispatch_mode="${{ inputs.dispatch_mode || 'auto_14_6' }}" \
             -f bat_gd1_quet_maps="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd1_quet_maps) || 'true' }}" \
             -f bat_gd2_chuan_hoa="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd2_chuan_hoa) || 'true' }}" \
-            -f bat_gd3_tra_dia_chi="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd3_tra_dia_chi) || 'false' }}" \
+            -f bat_gd3_tra_dia_chi="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd3_tra_dia_chi) || 'true' }}" \
             -f bat_gd4_bo_sung_sdt="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd4_bo_sung_sdt) || 'true' }}" \
             -f bat_gd5_xuat_hoan_thien="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd5_xuat_hoan_thien) || 'true' }}" \
             -f vet_delta_diem_thieu_sdt="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.vet_delta_diem_thieu_sdt) || 'true' }}" \
