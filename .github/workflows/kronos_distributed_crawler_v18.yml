@@ -255,6 +255,7 @@ jobs:
           VET_DELTA_DIEM_THIEU_SDT: ${{ inputs.vet_delta_diem_thieu_sdt }}
           EP_CHAY_LAI: ${{ inputs.ep_chay_lai }}
           KRONOS_MIN_PHONE_RATE: "0.01"
+          KRONOS_BREAKER_MIN_ATTEMPTS: "200"
           INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
