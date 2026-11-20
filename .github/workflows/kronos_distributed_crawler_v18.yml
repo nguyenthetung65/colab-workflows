@@ -108,9 +108,21 @@ on:
         default: false
         type: boolean
 
-  schedule:
-    # Cron du phong chong ngat quang (Canh gac moi 2 tieng neu self-chaining bi gian doan)
-    - cron: '0 */2 * * *'
+      tu_dong_noi_ca:
+        description: '14. Tu dong noi ca tiep theo khi xong (pilot: de false)'
+        required: false
+        default: false
+        type: boolean
+
+      max_runtime_giay:
+        description: '15. Gioi han thoi gian cao giay (Pilot: 1500, 24/7: 18000)'
+        required: false
+        default: '18000'
+        type: string
+
+  # schedule:
+  #   # Cron du phong chong ngat quang (Tam thoi comment de chay thi diem an toan, khong chiem quota)
+  #   - cron: '0 */2 * * *'
 
 # Khoa chong chong cheo ca: cancel-in-progress: false giup xep hang, khong tao song song vuot quota
 concurrency:
@@ -234,7 +246,7 @@ jobs:
           KRONOS_NUM_WORKERS: 14
           KRONOS_LIMIT: 3000
           KRONOS_GRID_LIMIT: 3000
-          KRONOS_MAX_RUNTIME_SEC: 18000 # 5 gio (chua 20 phut du phong cho Flush WAL & Dong goi)
+          KRONOS_MAX_RUNTIME_SEC: ${{ inputs.max_runtime_giay || '18000' }}
           BAT_GD1_QUET_MAPS: ${{ inputs.bat_gd1_quet_maps }}
           BAT_GD2_CHUAN_HOA: ${{ inputs.bat_gd2_chuan_hoa }}
           BAT_GD3_TRA_DIA_CHI: ${{ inputs.bat_gd3_tra_dia_chi }}
@@ -375,7 +387,7 @@ jobs:
   # Job doc lap tu dong noi ca: Chi kich hoat khi ca truoc thanh cong va nguoi dung khong bam Cancel
   relay-next-shift:
     needs: kronos-worker
-    if: ${{ !cancelled() && needs.kronos-worker.result == 'success' }}
+    if: ${{ !cancelled() && needs.kronos-worker.result == 'success' && (github.event_name == 'schedule' || inputs.tu_dong_noi_ca) }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -415,4 +427,6 @@ jobs:
             -f bat_gd4_bo_sung_sdt="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd4_bo_sung_sdt) || 'true' }}" \
             -f bat_gd5_xuat_hoan_thien="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd5_xuat_hoan_thien) || 'true' }}" \
             -f vet_delta_diem_thieu_sdt="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.vet_delta_diem_thieu_sdt) || 'true' }}" \
-            -f ep_chay_lai=false
+            -f ep_chay_lai=false \
+            -f tu_dong_noi_ca=true \
+            -f max_runtime_giay=18000
