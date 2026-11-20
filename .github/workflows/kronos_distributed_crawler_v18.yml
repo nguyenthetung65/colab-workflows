@@ -110,9 +110,9 @@ on:
         type: boolean
 
       tu_dong_noi_ca:
-        description: '14. Tu dong noi ca tiep theo khi xong (pilot: de false)'
+        description: '14. Tu dong noi ca tiep theo khi xong (mac dinh: true 24/7)'
         required: false
-        default: false
+        default: true
         type: boolean
 
       max_runtime_giay:
