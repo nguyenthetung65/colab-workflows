@@ -169,7 +169,7 @@ jobs:
       - name: 5. Preflight Fail-Fast Guard (<60s chong chay mu 5 gio)
         run: |
           python - <<'PY'
-          import sys, importlib, os
+          import sys, os, importlib.util
           required = ["openpyxl", "playwright", "curl_cffi", "cryptography", "aiohttp", "pandas", "boto3", "psutil"]
           missing = [m for m in required if not importlib.util.find_spec(m)]
           if missing:
