@@ -365,16 +365,24 @@ jobs:
             /dev/shm/kronos_core/*.db
           key: kronos-cache-${{ env.KRONOS_CYCLE_ID }}-w${{ matrix.worker_id }}-${{ inputs.industry }}-${{ github.run_number }}-${{ github.run_attempt }}
 
-      - name: 9. [DUAL-ENGINE SAVE - TANG 3] Sao luu GitHub Artifacts (Phong thu 30 ngay)
+      - name: 9a. [BAO MAT REPO PUBLIC] Ma hoa goi artifact truoc khi upload
+        if: always()
+        env:
+          KRONOS_CORE_PASSWORD: ${{ secrets.KRONOS_CORE_PASSWORD }}
+        run: |
+          mkdir -p /tmp/art && cd /tmp/art
+          tar czf bundle.tgz -P /dev/shm/kronos_core/stage_checkpoints/*.db /dev/shm/kronos_core/*.xlsx /dev/shm/kronos_core/*.csv /tmp/kronos_run/kronos_cloud_buffer_*.json 2>/dev/null || true
+          if [ -s bundle.tgz ]; then
+            openssl enc -aes-256-cbc -pbkdf2 -salt -in bundle.tgz -out bundle.tgz.enc -pass env:KRONOS_CORE_PASSWORD
+          fi
+          rm -f bundle.tgz
+
+      - name: 9b. [DUAL-ENGINE SAVE - TANG 3] Sao luu GitHub Artifacts da ma hoa AES-256 (Phong thu 30 ngay)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: kronos-w${{ matrix.worker_id }}-attempt${{ github.run_attempt }}
-          path: |
-            /dev/shm/kronos_core/stage_checkpoints/*.db
-            /dev/shm/kronos_core/*.xlsx
-            /dev/shm/kronos_core/*.csv
-            /tmp/kronos_run/kronos_cloud_buffer_*.json
+          path: /tmp/art/bundle.tgz.enc
           retention-days: 30
           if-no-files-found: warn
 
