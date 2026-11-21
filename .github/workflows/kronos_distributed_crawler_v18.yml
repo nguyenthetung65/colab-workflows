@@ -1,4 +1,4 @@
-name: KRONOS-HYBRID DISTRIBUTED ZERO-COST CRAWLER (BỘ 18 - 24/7 ZERO-LOSS)
+name: KRONOS-HYBRID DISTRIBUTED ZERO-COST CRAWLER (BỘ 20 - 24/7 ZERO-IDLE MAX-THROUGHPUT)
 
 on:
   workflow_dispatch:
@@ -272,7 +272,7 @@ jobs:
           industry = os.environ.get("KRONOS_INDUSTRY", "all_7_nganh").lower()
           custom_script = os.environ.get("KRONOS_CUSTOM_SCRIPT", "").strip()
 
-          script_to_run = "kronos_github_runner_unified_v18.py" if os.path.exists("kronos_github_runner_unified_v18.py") else "kronos_github_runner_unified.py"
+          script_to_run = "kronos_github_runner_unified_v20.py" if os.path.exists("kronos_github_runner_unified_v20.py") else ("kronos_github_runner_unified_v18.py" if os.path.exists("kronos_github_runner_unified_v18.py") else "kronos_github_runner_unified.py")
 
           if custom_script and os.path.exists(custom_script):
               script_to_run = custom_script
@@ -398,7 +398,10 @@ jobs:
   # Job doc lap tu dong noi ca: Chi kich hoat khi ca truoc thanh cong va nguoi dung khong bam Cancel
   relay-next-shift:
     needs: kronos-worker
-    if: ${{ !cancelled() && needs.kronos-worker.result == 'success' && (github.event_name == 'schedule' || inputs.tu_dong_noi_ca) }}
+    if: ${{ !cancelled()
+            && (needs.kronos-worker.result == 'success' || needs.kronos-worker.result == 'failure')
+            && vars.KRONOS_RELAY_ENABLED != 'false'
+            && (github.event_name == 'schedule' || inputs.tu_dong_noi_ca) }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
