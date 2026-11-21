@@ -57,13 +57,13 @@ on:
         type: string
 
       dispatch_mode:
-        description: '6. Che do phan phoi Worker (auto_14_6: 14 quet moi + 6 vet SDT)'
+        description: '6. Che do phan phoi Worker (all_independent: 20 may chay doc lap 100% suot 5h, khong cho doi)'
         required: true
-        default: 'auto_14_6'
+        default: 'all_independent'
         type: choice
         options:
+          - all_independent
           - auto_14_6
-          - auto_10_4
           - all_new
           - all_vet
 
@@ -240,7 +240,7 @@ jobs:
           MASTER_INGEST_PORT: "8000"
           KRONOS_INDUSTRY: ${{ inputs.industry || 'all_7_nganh' }}
           KRONOS_PROVINCE: ${{ inputs.chon_che_do_tinh == 'chon_1_tinh_cu_the' && inputs.tinh_cu_the || inputs.chon_che_do_tinh || 'toan-quoc' }}
-          KRONOS_DISPATCH_MODE: ${{ inputs.dispatch_mode || 'auto_14_6' }}
+          KRONOS_DISPATCH_MODE: ${{ inputs.dispatch_mode || 'all_independent' }}
           KRONOS_LOAI_WORKFLOW: ${{ inputs.loai_workflow || 'all_in_one' }}
           KRONOS_CUSTOM_SCRIPT: ${{ inputs.custom_script_path || '' }}
           KRONOS_WORKER_ID: ${{ matrix.worker_id }}
@@ -434,7 +434,7 @@ jobs:
             -f custom_script_path="${{ inputs.custom_script_path || '' }}" \
             -f chon_che_do_tinh="${{ inputs.chon_che_do_tinh || 'toan-quoc' }}" \
             -f tinh_cu_the="${{ inputs.tinh_cu_the || 'Hà Nội' }}" \
-            -f dispatch_mode="${{ inputs.dispatch_mode || 'auto_14_6' }}" \
+            -f dispatch_mode="${{ inputs.dispatch_mode || 'all_independent' }}" \
             -f bat_gd1_quet_maps="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd1_quet_maps) || 'true' }}" \
             -f bat_gd2_chuan_hoa="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd2_chuan_hoa) || 'true' }}" \
             -f bat_gd3_tra_dia_chi="${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.bat_gd3_tra_dia_chi) || 'true' }}" \
