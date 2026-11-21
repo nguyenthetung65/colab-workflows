@@ -240,7 +240,7 @@ jobs:
           MASTER_INGEST_PORT: "8000"
           KRONOS_INDUSTRY: ${{ inputs.industry || 'all_7_nganh' }}
           KRONOS_PROVINCE: ${{ inputs.chon_che_do_tinh == 'chon_1_tinh_cu_the' && inputs.tinh_cu_the || inputs.chon_che_do_tinh || 'toan-quoc' }}
-          KRONOS_DISPATCH_MODE: ${{ inputs.dispatch_mode || 'auto_10_4' }}
+          KRONOS_DISPATCH_MODE: ${{ inputs.dispatch_mode || 'auto_14_6' }}
           KRONOS_LOAI_WORKFLOW: ${{ inputs.loai_workflow || 'all_in_one' }}
           KRONOS_CUSTOM_SCRIPT: ${{ inputs.custom_script_path || '' }}
           KRONOS_WORKER_ID: ${{ matrix.worker_id }}
@@ -376,7 +376,7 @@ jobs:
           mkdir -p /tmp/art && cd /tmp/art
           tar czf bundle.tgz -P /dev/shm/kronos_core/stage_checkpoints/*.db /dev/shm/kronos_core/*.xlsx /dev/shm/kronos_core/*.csv /tmp/kronos_run/kronos_cloud_buffer_*.json 2>/dev/null || true
           if [ -s bundle.tgz ]; then
-            openssl enc -aes-256-cbc -pbkdf2 -salt -in bundle.tgz -out bundle.tgz.enc -pass env:KRONOS_CORE_PASSWORD
+            openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt -in bundle.tgz -out bundle.tgz.enc -pass env:KRONOS_CORE_PASSWORD
           fi
           rm -f bundle.tgz
 
