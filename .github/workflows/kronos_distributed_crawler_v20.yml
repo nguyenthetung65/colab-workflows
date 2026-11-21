@@ -127,7 +127,7 @@ on:
 
 # Khoa chong chong cheo ca: cancel-in-progress: false giup xep hang, khong tao song song vuot quota
 concurrency:
-  group: kronos-global-crawler-pipeline
+  group: kronos-global-crawler-pipeline-v20
   cancel-in-progress: false
 
 jobs:
@@ -427,7 +427,7 @@ jobs:
             *) NEXT=thuoc_la;;
           esac
           echo "🚀 Ca hien tai: $CUR ──► Kich hoat ca tiep theo: $NEXT"
-          gh workflow run kronos_distributed_crawler_v18.yml \
+          gh workflow run kronos_distributed_crawler_v20.yml \
             --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
             -f industry="$NEXT" \
             -f loai_workflow="${{ inputs.loai_workflow || 'all_in_one' }}" \
