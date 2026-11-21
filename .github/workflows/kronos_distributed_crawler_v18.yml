@@ -273,7 +273,7 @@ jobs:
           industry = os.environ.get("KRONOS_INDUSTRY", "all_7_nganh").lower()
           custom_script = os.environ.get("KRONOS_CUSTOM_SCRIPT", "").strip()
 
-          script_to_run = "kronos_github_runner_unified_v20.py" if os.path.exists("kronos_github_runner_unified_v20.py") else ("kronos_github_runner_unified_v18.py" if os.path.exists("kronos_github_runner_unified_v18.py") else "kronos_github_runner_unified.py")
+          script_to_run = "kronos_github_runner_unified_v18.py" if os.path.exists("kronos_github_runner_unified_v18.py") else ("kronos_github_runner_unified_v20.py" if os.path.exists("kronos_github_runner_unified_v20.py") else "kronos_github_runner_unified.py")
 
           if custom_script and os.path.exists(custom_script):
               script_to_run = custom_script
