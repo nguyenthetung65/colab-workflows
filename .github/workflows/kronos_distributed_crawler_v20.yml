@@ -244,8 +244,8 @@ jobs:
           KRONOS_CUSTOM_SCRIPT: ${{ inputs.custom_script_path || '' }}
           KRONOS_WORKER_ID: ${{ matrix.worker_id }}
           KRONOS_NUM_WORKERS: 20
-          KRONOS_LIMIT: 3000
-          KRONOS_GRID_LIMIT: 3000
+          KRONOS_LIMIT: 5000
+          KRONOS_GRID_LIMIT: 5000
           KRONOS_MAX_RUNTIME_SEC: ${{ inputs.max_runtime_giay || '18000' }}
           BAT_GD1_QUET_MAPS: ${{ inputs.bat_gd1_quet_maps }}
           BAT_GD2_CHUAN_HOA: ${{ inputs.bat_gd2_chuan_hoa }}
