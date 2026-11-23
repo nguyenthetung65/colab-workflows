@@ -116,9 +116,9 @@ on:
         type: boolean
 
       max_runtime_giay:
-        description: '15. Gioi han thoi gian cao giay (Pilot: 1500, 24/7: 18000)'
+        description: '15. Gioi han thoi gian cao giay (Pilot: 1500, 24/7: 17400)'
         required: false
-        default: '18000'
+        default: '17400'
         type: string
 
   schedule:
@@ -233,6 +233,7 @@ jobs:
           PY
 
       - name: 7. Khoi chay Kronos Dispatcher Engine theo Workflow duoc chon
+        continue-on-error: true
         timeout-minutes: 320 # Gioi han runner 320 phut, danh 30 phut du phong cho Flush WAL & Sync
         env:
           MASTER_PC_IP: "100.78.157.51"
@@ -246,7 +247,7 @@ jobs:
           KRONOS_NUM_WORKERS: 20
           KRONOS_LIMIT: 5000
           KRONOS_GRID_LIMIT: 5000
-          KRONOS_MAX_RUNTIME_SEC: ${{ inputs.max_runtime_giay || '18000' }}
+          KRONOS_MAX_RUNTIME_SEC: ${{ inputs.max_runtime_giay || '17400' }}
           BAT_GD1_QUET_MAPS: ${{ inputs.bat_gd1_quet_maps }}
           BAT_GD2_CHUAN_HOA: ${{ inputs.bat_gd2_chuan_hoa }}
           BAT_GD3_TRA_DIA_CHI: ${{ inputs.bat_gd3_tra_dia_chi }}
@@ -292,8 +293,13 @@ jobs:
                   print("🎯 [BỘ 17 PHỤC HỒI SĐT 4 TẦNG] Kích hoạt: OCR Biển hiệu + Dấu chân số + MST + Tuyến đường DBSCAN.")
 
           cmd = [sys.executable, script_to_run]
-          res = subprocess.run(cmd)
-          sys.exit(res.returncode)
+          try:
+              # Gioi han 295 phut (17,700s) de tu thu quan em dep truoc timeout 320 phut cua GitHub
+              res = subprocess.run(cmd, timeout=17700)
+              sys.exit(res.returncode)
+          except subprocess.TimeoutExpired:
+              print("\n⏰ [GRACEFUL SELF-EXIT] Runner da chay tron ven 295 phut! Tu dong ket thuc em dep (Exit 0) de Flush WAL & Sync Checkpoint an toan.")
+              sys.exit(0)
           PY
 
       - name: 8. Flush SQLite WAL Checkpoints (Ep ghi sach tu .db-wal vao .db)
@@ -398,6 +404,7 @@ jobs:
   relay-next-shift:
     needs: kronos-worker
     if: ${{ always()
+            && !cancelled()
             && vars.KRONOS_RELAY_ENABLED != 'false'
             && (github.event_name == 'schedule' || inputs.tu_dong_noi_ca || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
