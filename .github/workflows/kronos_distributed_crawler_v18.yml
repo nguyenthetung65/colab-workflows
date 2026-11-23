@@ -121,11 +121,10 @@ on:
         default: '18000'
         type: string
 
-  # schedule:
-  #   # Cron du phong chong ngat quang (Tam thoi comment de chay thi diem an toan, khong chiem quota)
-  #   - cron: '0 */2 * * *'
+  schedule:
+    # Cron Watchdog tu phuc hoi chong dut ca (Moi 3 gio kiem tra 1 lan)
+    - cron: '15 */3 * * *'
 
-# Khoa chong chong cheo ca: cancel-in-progress: false giup xep hang, khong tao song song vuot quota
 concurrency:
   group: kronos-global-crawler-pipeline
   cancel-in-progress: false
@@ -398,10 +397,9 @@ jobs:
   # Job doc lap tu dong noi ca: Chi kich hoat khi ca truoc thanh cong va nguoi dung khong bam Cancel
   relay-next-shift:
     needs: kronos-worker
-    if: ${{ !cancelled()
-            && (needs.kronos-worker.result == 'success' || needs.kronos-worker.result == 'failure')
+    if: ${{ always()
             && vars.KRONOS_RELAY_ENABLED != 'false'
-            && (github.event_name == 'schedule' || inputs.tu_dong_noi_ca) }}
+            && (github.event_name == 'schedule' || inputs.tu_dong_noi_ca || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -411,8 +409,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           STARTED=$(date -u -d "${{ github.run_started_at }}" +%s)
-          if [ $(( $(date -u +%s) - STARTED )) -lt 1800 ]; then
-            echo "⏸ Ca chạy dưới 30 phút (bất thường hoặc đã hoàn tất chu kỳ tuần này), không tự nối. Chờ cron 2h."
+          DURATION=$(( $(date -u +%s) - STARTED ))
+          if [ $DURATION -lt 1800 ]; then
+            echo "⏸ Ca chay duoi 30 phut (nguoi dung huy ca som hoac bat thuong), khong tu noi ca tiep."
             exit 0
           fi
 
