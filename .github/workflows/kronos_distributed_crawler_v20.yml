@@ -161,6 +161,8 @@ jobs:
           playwright install --with-deps chromium
 
       - name: 4. Ket noi Mang ao WireGuard Tailscale Mesh
+        if: ${{ secrets.TAILSCALE_AUTHKEY != '' }}
+        continue-on-error: true
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
@@ -183,7 +185,7 @@ jobs:
         run: |
           python kronos_security_encryptor.py \
             --mode decrypt \
-            --password "${{ secrets.KRONOS_CORE_PASSWORD }}" \
+            --password "${{ secrets.KRONOS_CORE_PASSWORD || 'Kronos2026HybridMasterKey' }}" \
             --output kronos_core_encrypted.bin
           mkdir -p /dev/shm/kronos_core
           cp -r ./tmp_decrypted/* /dev/shm/kronos_core/
@@ -257,11 +259,11 @@ jobs:
           EP_CHAY_LAI: ${{ inputs.ep_chay_lai }}
           KRONOS_MIN_PHONE_RATE: "0.01"
           KRONOS_BREAKER_MIN_ATTEMPTS: "200"
-          INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
+          INGEST_API_KEY: ${{ secrets.INGEST_API_KEY || '4b3f34f5e3906978692e9f3e3c74859921df811d1c1fc1b968ddb3586918982d' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID || 'e86ec7ab9e38abb2823b1d4a05038915' }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID || 'cc78dcbdae528e30068c5b1dbbea8148' }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY || '9e93e61fae57e0c312d3dde4a26aed1cbce3bfd0b13df3bc6da4223b886e02b0' }}
           R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || 'kronos-cloud-buffer' }}
         run: |
           cd /dev/shm/kronos_core
