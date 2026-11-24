@@ -161,12 +161,17 @@ jobs:
           playwright install --with-deps chromium
 
       - name: 4. Ket noi Mang ao WireGuard Tailscale Mesh
-        if: ${{ secrets.TAILSCALE_AUTHKEY != '' }}
         continue-on-error: true
-        uses: tailscale/github-action@v2
-        with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          args: --accept-routes=true --hostname=kronos-gh-worker-${{ matrix.worker_id }}
+        env:
+          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+        run: |
+          if [ -n "$TS_AUTHKEY" ]; then
+            curl -fsSL https://tailscale.com/install.sh | sh
+            tailscale up --authkey="$TS_AUTHKEY" --accept-routes=true --hostname="kronos-gh-worker-${{ matrix.worker_id }}"
+            echo "✅ Tailscale connected successfully!"
+          else
+            echo "ℹ️ TAILSCALE_AUTHKEY chua duoc cau hinh trong Secrets, bo qua buoc nay va tiep tuc qua Cloud Buffer."
+          fi
 
       - name: 5. Preflight Fail-Fast Guard (<60s chong chay mu 5 gio)
         run: |
