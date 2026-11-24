@@ -1,4 +1,4 @@
-name: [BỘ 18] KRONOS 20 WORKERS (14 QUÉT MỚI + 6 VÉT SĐT)
+name: "BO 18 - KRONOS 20 WORKERS (14 QUET MOI + 6 VET SDT)"
 
 on:
   workflow_dispatch:

@@ -1,4 +1,4 @@
-name: [BỘ 20] KRONOS 20 WORKERS ĐỘC LẬP 24/7 (KHUYÊN DÙNG)
+name: "BO 20 - KRONOS 20 WORKERS DOC LAP 24-7 (KHUYEN DUNG)"
 
 on:
   workflow_dispatch:
